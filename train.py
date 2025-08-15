@@ -13,7 +13,7 @@ import numpy as np
 
 from tetris_env import Tetris
 from dqn_agent import DQNAgent
-from utils import plot_frame_ascii, plot_frame_pygame
+from visualize import ascii_render  # Fixed import
 
 # -------------------
 # Argument Parser
@@ -44,6 +44,8 @@ random.seed(42)
 np.random.seed(42)
 torch.manual_seed(42)
 
+print(f"Using device: {device}")
+
 # -------------------
 # TensorBoard
 # -------------------
@@ -58,6 +60,9 @@ else:
 env = Tetris(render_mode=args.render_backend if args.render else None)
 state_shape = env.get_state().shape
 n_actions = env.action_space
+
+print(f"State shape: {state_shape}")
+print(f"Number of actions: {n_actions}")
 
 agent = DQNAgent(
     state_shape=state_shape,
@@ -77,6 +82,8 @@ agent = DQNAgent(
 # Training Loop
 # -------------------
 global_step = 0
+
+print("Starting training...")
 
 for episode in range(args.episodes):
     state = env.reset()
@@ -102,18 +109,28 @@ for episode in range(args.episodes):
             if args.tb and loss is not None:
                 writer.add_scalar("Loss/train", loss, global_step)
 
+        # Update target network - FIXED: Added this missing part
+        if global_step % args.target_update == 0:
+            agent.update_target_network()
+
         # Epsilon decay step
         agent.update_epsilon()
 
         # Live rendering every N steps
         if args.render and global_step % args.render_every == 0:
             if args.render_backend == "ascii":
-                plot_frame_ascii(env.get_frame())
+                print(f"\nStep {global_step}, Episode {episode + 1}")
+                print(ascii_render(env.get_frame()))
             elif args.render_backend == "pygame":
-                plot_frame_pygame(env.get_frame())
+                env.render()
 
     # Episode finished
     if args.tb:
         writer.add_scalar("Reward/episode", episode_reward, episode)
 
     print(f"[Episode {episode+1}/{args.episodes}] Reward: {episode_reward:.2f} Epsilon: {agent.epsilon:.4f}")
+
+if args.tb:
+    writer.close()
+
+print("Training completed!")
